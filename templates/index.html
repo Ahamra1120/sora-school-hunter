@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Peta Sekolah Swasta Jakarta — SORA</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/static/css/dashboard.css" />
+</head>
+<body>
+
+<!-- ── HEADER ─────────────────────────────────────────────── -->
+<header class="header">
+  <div class="header-left">
+    <span class="logo">SORA</span>
+    <h1>Peta Sekolah Swasta Jakarta</h1>
+  </div>
+  <div class="header-stats" id="headerStats">
+    <div class="stat-chip" id="statTotal">— sekolah</div>
+    <div class="stat-chip" id="statSpp">SPP: —%</div>
+    <div class="stat-chip" id="statFiltered">Ditampilkan: —</div>
+  </div>
+</header>
+
+<!-- ── MAIN LAYOUT ────────────────────────────────────────── -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <!-- Search -->
+    <div class="sidebar-section">
+      <label class="section-title">Cari Sekolah</label>
+      <input type="text" id="searchInput" class="search-input" placeholder="Nama sekolah..." />
+    </div>
+
+    <!-- Filter Jenjang -->
+    <div class="sidebar-section">
+      <label class="section-title">Jenjang</label>
+      <div class="checkbox-group">
+        <label><input type="checkbox" class="filter-jenjang" value="SD" checked /> SD</label>
+        <label><input type="checkbox" class="filter-jenjang" value="SMP" checked /> SMP</label>
+        <label><input type="checkbox" class="filter-jenjang" value="SMA" checked /> SMA</label>
+      </div>
+    </div>
+
+    <!-- Filter Segmen SPP -->
+    <div class="sidebar-section">
+      <label class="section-title">Segmen SPP</label>
+      <div class="checkbox-group">
+        <label>
+          <input type="checkbox" class="filter-segmen" value="Budget" checked />
+          <span class="dot" style="background:#3b82f6"></span> Budget (&lt;500rb)
+        </label>
+        <label>
+          <input type="checkbox" class="filter-segmen" value="Menengah" checked />
+          <span class="dot" style="background:#22c55e"></span> Menengah (500rb–1,5jt)
+        </label>
+        <label>
+          <input type="checkbox" class="filter-segmen" value="Premium" checked />
+          <span class="dot" style="background:#eab308"></span> Premium (1,5–3jt)
+        </label>
+        <label>
+          <input type="checkbox" class="filter-segmen" value="Ultra Premium" checked />
+          <span class="dot" style="background:#ef4444"></span> Ultra Premium (&gt;3jt)
+        </label>
+        <label>
+          <input type="checkbox" class="filter-segmen" value="Tidak Diketahui" checked />
+          <span class="dot" style="background:#9ca3af"></span> SPP tidak diketahui
+        </label>
+      </div>
+    </div>
+
+    <!-- Filter Kecamatan -->
+    <div class="sidebar-section">
+      <label class="section-title">Kecamatan</label>
+      <select id="filterKecamatan" class="select-input">
+        <option value="">Semua kecamatan</option>
+      </select>
+    </div>
+
+    <!-- Tombol Reset -->
+    <button id="btnReset" class="btn-reset">Reset Filter</button>
+
+    <!-- Chart Distribusi -->
+    <div class="sidebar-section chart-section">
+      <label class="section-title">Distribusi Segmen SPP</label>
+      <canvas id="sppChart" height="200"></canvas>
+    </div>
+
+    <!-- Tabel ringkas -->
+    <div class="sidebar-section">
+      <label class="section-title">Sekolah Tanpa Koordinat</label>
+      <div id="noCoordCount" class="no-coord-info">—</div>
+    </div>
+
+  </aside>
+
+  <!-- MAP -->
+  <main class="map-container">
+    <div id="map"></div>
+    <div id="mapOverlay" class="map-overlay hidden">
+      <div class="overlay-card">
+        <div class="overlay-icon">🏫</div>
+        <p id="overlayMsg">Memuat data...</p>
+      </div>
+    </div>
+  </main>
+
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Custom JS -->
+<script src="/static/js/dashboard.js"></script>
+
+</body>
+</html>

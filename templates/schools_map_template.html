@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Peta Sebaran Sekolah Swasta DKI Jakarta</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<style>
+  :root{
+    --c-sd:#2e7dd1; --c-smp:#2aa05a; --c-sma:#e8842c; --c-smk:#8e5bd1; --c-other:#8a93a0;
+    --bg:#f7f8fa; --panel:#ffffff; --text:#1d2733; --muted:#6b7686; --border:#e3e7ec;
+    --shadow:0 2px 12px rgba(20,30,45,.10);
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  html,body{height:100%}
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif; color:var(--text); background:var(--bg); overflow:hidden}
+
+  #app{display:flex; height:100vh; height:100dvh}
+
+  /* ---------- Sidebar ---------- */
+  #sidebar{
+    width:330px; min-width:330px; background:var(--panel); border-right:1px solid var(--border);
+    display:flex; flex-direction:column; z-index:1001; box-shadow:var(--shadow);
+    transition:transform .25s ease;
+  }
+  #sidebar header{padding:18px 18px 12px}
+  #sidebar h1{font-size:17px; font-weight:700; line-height:1.3}
+  #sidebar .sub{font-size:12px; color:var(--muted); margin-top:4px}
+
+  .stats{display:grid; grid-template-columns:repeat(2,1fr); gap:8px; padding:0 18px 14px}
+  .stat{background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:10px 12px}
+  .stat b{display:block; font-size:20px; font-weight:700}
+  .stat span{font-size:11px; color:var(--muted)}
+
+  .panel-body{flex:1; overflow-y:auto; padding:0 18px 18px}
+  .group{margin-bottom:16px}
+  .group label.title{display:block; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:7px}
+
+  #search{
+    width:100%; padding:9px 12px; border:1px solid var(--border); border-radius:9px;
+    font-size:13px; background:var(--bg); outline:none;
+  }
+  #search:focus{border-color:var(--c-sd); background:#fff}
+
+  .chips{display:flex; flex-wrap:wrap; gap:6px}
+  .chip{
+    border:1.5px solid var(--border); background:#fff; border-radius:999px;
+    padding:5px 12px; font-size:12.5px; cursor:pointer; user-select:none;
+    display:inline-flex; align-items:center; gap:6px; transition:all .15s; color:var(--muted);
+  }
+  .chip .dot{width:9px; height:9px; border-radius:50%; background:var(--dot,#999)}
+  .chip.active{color:#fff; border-color:transparent; background:var(--dot,#555)}
+  .chip.active .dot{background:#fff}
+
+  select{
+    width:100%; padding:9px 10px; border:1px solid var(--border); border-radius:9px;
+    font-size:13px; background:#fff; color:var(--text); outline:none; cursor:pointer;
+  }
+
+  .legend{font-size:12.5px; color:var(--muted); line-height:1.9}
+  .legend .dot{display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:8px; vertical-align:middle}
+
+  .note{font-size:11px; color:var(--muted); border-top:1px solid var(--border); padding-top:10px; line-height:1.5}
+
+  #resetBtn{
+    width:100%; padding:9px; border:1px solid var(--border); background:#fff; border-radius:9px;
+    font-size:13px; cursor:pointer; color:var(--text); margin-bottom:16px;
+  }
+  #resetBtn:hover{background:var(--bg)}
+
+  /* ---------- Map ---------- */
+  #map{flex:1; height:100%; z-index:1}
+
+  /* ---------- Mobile toggle ---------- */
+  #togglePanel{
+    display:none; position:fixed; top:12px; left:12px; z-index:1100;
+    background:var(--panel); border:1px solid var(--border); border-radius:10px;
+    padding:9px 14px; font-size:13.5px; font-weight:600; cursor:pointer; box-shadow:var(--shadow);
+    color:var(--text);
+  }
+  #scrim{display:none; position:fixed; inset:0; background:rgba(15,23,32,.35); z-index:1000}
+
+  @media (max-width: 768px){
+    #sidebar{
+      position:fixed; top:0; left:0; bottom:0; width:min(86vw,330px); min-width:0;
+      transform:translateX(-105%);
+    }
+    #sidebar.open{transform:translateX(0)}
+    #scrim.show{display:block}
+    #togglePanel{display:block}
+    .stats{grid-template-columns:repeat(2,1fr)}
+  }
+
+  /* ---------- Popup ---------- */
+  .leaflet-popup-content-wrapper{border-radius:12px; box-shadow:var(--shadow)}
+  .leaflet-popup-content{margin:14px 16px; min-width:220px; max-width:270px}
+  .pp .badge{
+    display:inline-block; font-size:10.5px; font-weight:700; color:#fff;
+    border-radius:6px; padding:2px 8px; margin-right:5px; letter-spacing:.03em;
+  }
+  .pp .badge.akr{background:#5b6678}
+  .pp h3{font-size:14px; margin:7px 0 4px; line-height:1.35}
+  .pp .row{font-size:12px; color:var(--muted); margin-top:4px; line-height:1.45}
+  .pp .row b{color:var(--text); font-weight:600}
+  .pp a{color:var(--c-sd); word-break:break-all}
+
+  .pp .links{display:flex; gap:7px; margin-top:10px}
+  .pp .links a{
+    flex:1; text-align:center; font-size:12px; font-weight:600; text-decoration:none;
+    border:1px solid var(--border); border-radius:8px; padding:6px 4px; color:var(--text); background:var(--bg);
+    word-break:normal;
+  }
+  .pp .links a.gm{color:#fff; background:#1a73e8; border-color:#1a73e8}
+
+  .pp .visit{margin-top:10px; border-top:1px solid var(--border); padding-top:9px}
+  .pp .visit .vlabel{display:block; font-size:10.5px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px}
+  .pp select.vsel, .pp textarea.vnote{
+    width:100%; border:1px solid var(--border); border-radius:8px; font-size:12.5px;
+    padding:7px 8px; font-family:inherit; background:#fff; color:var(--text); outline:none;
+  }
+  .pp textarea.vnote{resize:vertical; min-height:52px}
+  .pp .vsave{
+    margin-top:7px; width:100%; padding:7px; border:none; border-radius:8px;
+    background:var(--text); color:#fff; font-size:12.5px; font-weight:600; cursor:pointer;
+  }
+  .pp .vmeta{font-size:11px; color:var(--muted); margin-top:5px}
+
+  .btn-sm{
+    width:100%; padding:8px; border:1px solid var(--border); background:#fff; border-radius:9px;
+    font-size:12.5px; cursor:pointer; color:var(--text); margin-bottom:6px; text-align:left;
+  }
+  .btn-sm:hover{background:var(--bg)}
+
+  #sheetsUrl{
+    width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:9px;
+    font-size:11.5px; background:var(--bg); color:var(--text); outline:none;
+  }
+  #sheetsUrl:focus{border-color:var(--c-sd); background:#fff}
+  .sync-status{font-size:12px; font-weight:600; margin-bottom:8px; display:flex; align-items:center; gap:5px}
+  .sync-status.off{color:var(--muted)}
+  .sync-status.on{color:#18a058}
+  .sync-status.busy{color:#f59e0b}
+  .sync-status.err{color:#e23b3b}
+
+  .marker-pin{border-radius:50%; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.35)}
+  .marker-pin.v-progress{border:3px solid #f5b400}
+  .marker-pin.v-ditolak{border:3px solid #e23b3b}
+  .marker-pin.v-diterima{border:3px solid #18a058}
+
+  .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large{background:rgba(46,125,209,.25)}
+  .marker-cluster-small div, .marker-cluster-medium div, .marker-cluster-large div{
+    background:rgba(46,125,209,.85); color:#fff; font-weight:600;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar">
+    <header>
+      <h1>🏫 Peta Sebaran Sekolah Swasta</h1>
+      <div class="sub">DKI Jakarta &mdash; data <i>schools_enriched.csv</i></div>
+    </header>
+
+    <div class="stats">
+      <div class="stat"><b id="statShown">0</b><span>Sekolah ditampilkan</span></div>
+      <div class="stat"><b id="statTotal">0</b><span>Total di peta</span></div>
+    </div>
+
+    <div class="panel-body">
+      <div class="group">
+        <label class="title">Cari sekolah</label>
+        <input id="search" type="search" placeholder="Nama sekolah, NPSN, kelurahan…">
+      </div>
+
+      <div class="group">
+        <label class="title">Jenjang</label>
+        <div class="chips" id="chipJenjang"></div>
+      </div>
+
+      <div class="group">
+        <label class="title">Wilayah (Kota)</label>
+        <select id="selKota"><option value="">Semua wilayah</option></select>
+      </div>
+
+      <div class="group">
+        <label class="title">Kecamatan</label>
+        <select id="selKec"><option value="">Semua kecamatan</option></select>
+      </div>
+
+      <div class="group">
+        <label class="title">Akreditasi</label>
+        <select id="selAkr"><option value="">Semua akreditasi</option></select>
+      </div>
+
+      <div class="group">
+        <label class="title">Status Kunjungan</label>
+        <select id="selVisit">
+          <option value="">Semua status</option>
+          <option value="none">Belum didatangi</option>
+          <option value="progress">In Progress</option>
+          <option value="ditolak">Ditolak</option>
+          <option value="diterima">Diterima</option>
+        </select>
+        <div class="legend" id="visitStats" style="margin-top:8px"></div>
+      </div>
+
+      <button id="resetBtn">↺ Reset semua filter</button>
+
+      <div class="group">
+        <label class="title">Sinkronisasi (Google Sheets)</label>
+        <div id="syncStatus" class="sync-status off">○ Belum terhubung</div>
+        <input id="sheetsUrl" type="url" placeholder="Tempel Web app URL (…/exec)" style="margin-bottom:6px">
+        <div style="display:flex; gap:6px">
+          <button class="btn-sm" id="connectBtn" style="margin:0">🔗 Hubungkan</button>
+          <button class="btn-sm" id="syncBtn" style="margin:0">🔄 Sinkron</button>
+        </div>
+        <div class="note" style="border:0; padding:4px 0 0; font-size:10.5px">Lihat <i>SETUP_GOOGLE_SHEETS.md</i> untuk cara mendapatkan URL.</div>
+      </div>
+
+      <div class="group">
+        <label class="title">Data Kunjungan</label>
+        <button class="btn-sm" id="exportCsv">⬇️ Ekspor kunjungan (CSV)</button>
+        <button class="btn-sm" id="backupJson">💾 Backup data (JSON)</button>
+        <button class="btn-sm" id="restoreJson">📂 Pulihkan dari backup</button>
+        <input type="file" id="restoreFile" accept=".json,application/json" hidden>
+      </div>
+
+      <div class="group">
+        <label class="title">Legenda</label>
+        <div class="legend" id="legend"></div>
+      </div>
+
+      <div class="note" id="noteCoords"></div>
+    </div>
+  </aside>
+
+  <div id="scrim"></div>
+  <button id="togglePanel">☰ Filter</button>
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+// Data: [npsn, nama, jenjang, status, alamat, kelurahan, kecamatan, kota, akreditasi, website, telepon, lat, lng]
+const SCHOOLS = __SCHOOLS_DATA__;
+
+const F = {NPSN:0, NAMA:1, JENJANG:2, STATUS:3, ALAMAT:4, KEL:5, KEC:6, KOTA:7, AKR:8, WEB:9, TEL:10, LAT:11, LNG:12};
+const COLORS = {SD:'#2e7dd1', SMP:'#2aa05a', SMA:'#e8842c', SMK:'#8e5bd1', 'Lainnya':'#8a93a0'};
+const jenjangOf = s => COLORS[s[F.JENJANG]] ? s[F.JENJANG] : 'Lainnya';
+
+// ---------- Map ----------
+const positron = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  subdomains:'abcd', maxZoom:20
+});
+const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom:19
+});
+
+const map = L.map('map', {center:[-6.2,106.83], zoom:11, layers:[positron], zoomControl:false});
+L.control.zoom({position:'bottomright'}).addTo(map);
+L.control.layers({'Clean Map (Positron)':positron, 'OpenStreetMap':osm}, null, {position:'topright'}).addTo(map);
+
+const cluster = L.markerClusterGroup({
+  maxClusterRadius:46, spiderfyOnMaxZoom:true, disableClusteringAtZoom:16, chunkedLoading:true
+});
+map.addLayer(cluster);
+
+// ---------- Data kunjungan (localStorage) ----------
+const VISIT_KEY = 'sora_school_visits_v1';
+const VSTATUS = {none:'Belum didatangi', progress:'In Progress', ditolak:'Ditolak', diterima:'Diterima'};
+const VCOLOR  = {none:'#aab2bd', progress:'#f5b400', ditolak:'#e23b3b', diterima:'#18a058'};
+let visits = {};
+try { visits = JSON.parse(localStorage.getItem(VISIT_KEY)) || {}; } catch(e) {}
+function saveVisits(){ try { localStorage.setItem(VISIT_KEY, JSON.stringify(visits)); } catch(e) { alert('Gagal menyimpan ke browser: ' + e.message); } }
+const visitOf = npsn => visits[npsn] || {status:'none', note:''};
+
+// ---------- Markers ----------
+const esc = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+function iconFor(x){
+  const st = visitOf(x.s[F.NPSN]).status || 'none';
+  const cls = st === 'none' ? '' : ' v-' + st;
+  return L.divIcon({
+    className:'', iconSize:[14,14], iconAnchor:[7,7],
+    html:`<div class="marker-pin${cls}" style="width:14px;height:14px;background:${COLORS[x.jj]}"></div>`
+  });
+}
+
+function popupHtml(x){
+  const s = x.s, npsn = s[F.NPSN], jj = x.jj;
+  const akr = s[F.AKR] && s[F.AKR] !== '-' ? s[F.AKR] : null;
+  let web = (s[F.WEB]||'').trim();
+  if (web && !/^https?:\/\//i.test(web)) web = 'http://' + web;
+  const v = visitOf(npsn);
+  const st = v.status || 'none';
+  return `<div class="pp">
+    <span class="badge" style="background:${COLORS[jj]}">${esc(jj)}</span>
+    ${akr ? `<span class="badge akr">Akreditasi ${esc(akr)}</span>` : ''}
+    ${st !== 'none' ? `<span class="badge" style="background:${VCOLOR[st]}">${VSTATUS[st]}</span>` : ''}
+    <h3>${esc(s[F.NAMA])}</h3>
+    <div class="row"><b>NPSN:</b> ${esc(npsn)} &nbsp;·&nbsp; ${esc(s[F.STATUS]||'-')}</div>
+    ${s[F.ALAMAT] ? `<div class="row"><b>Alamat:</b> ${esc(s[F.ALAMAT])}</div>` : ''}
+    <div class="row"><b>Wilayah:</b> ${esc(s[F.KEL])}, Kec. ${esc(s[F.KEC])}, ${esc(s[F.KOTA])}</div>
+    ${s[F.TEL] && s[F.TEL] !== '0' ? `<div class="row"><b>Telepon:</b> ${esc(s[F.TEL])}</div>` : ''}
+    ${web ? `<div class="row"><b>Web:</b> <a href="${esc(web)}" target="_blank" rel="noopener">${esc(s[F.WEB])}</a></div>` : ''}
+    <div class="links">
+      <a class="gm" href="https://www.google.com/maps/search/?api=1&query=${x.lat},${x.lng}" target="_blank" rel="noopener">📍 Google Maps</a>
+      <a href="https://www.google.com/maps/dir/?api=1&destination=${x.lat},${x.lng}" target="_blank" rel="noopener">🧭 Rute</a>
+    </div>
+    <div class="visit">
+      <span class="vlabel">Status kunjungan</span>
+      <select class="vsel" onchange="setVisitStatus('${npsn}', this.value)">
+        ${Object.entries(VSTATUS).map(([k,l]) => `<option value="${k}"${k===st?' selected':''}>${l}</option>`).join('')}
+      </select>
+      <span class="vlabel" style="margin-top:8px">Catatan</span>
+      <textarea class="vnote" id="vnote-${npsn}" placeholder="Tulis catatan kunjungan…">${esc(v.note||'')}</textarea>
+      <button class="vsave" onclick="saveVisitNote('${npsn}', this)">💾 Simpan catatan</button>
+      ${v.updated ? `<div class="vmeta">Diperbarui: ${new Date(v.updated).toLocaleString('id-ID')}</div>` : ''}
+    </div>
+  </div>`;
+}
+
+let noCoords = 0;
+const markers = []; // {m, s, jj, lat, lng, text}
+const byNpsn = {};
+for (const s of SCHOOLS){
+  const lat = parseFloat(s[F.LAT]), lng = parseFloat(s[F.LNG]);
+  if (!isFinite(lat) || !isFinite(lng)) { noCoords++; continue; }
+  const x = {
+    s, jj: jenjangOf(s), lat, lng,
+    text:(s[F.NAMA]+' '+s[F.NPSN]+' '+s[F.KEL]+' '+s[F.KEC]).toLowerCase()
+  };
+  x.m = L.marker([lat,lng], {icon: iconFor(x)}).bindPopup(() => popupHtml(x), {maxWidth:300});
+  markers.push(x);
+  byNpsn[s[F.NPSN]] = x;
+}
+
+// ---------- Aksi kunjungan ----------
+window.setVisitStatus = (npsn, val) => {
+  const v = visits[npsn] || (visits[npsn] = {});
+  v.status = val; v.updated = Date.now();
+  if (val === 'none' && !(v.note||'').trim()) delete visits[npsn];
+  saveVisits();
+  const x = byNpsn[npsn];
+  if (x) x.m.setIcon(iconFor(x));
+  updateVisitStats();
+  pushVisit(npsn);
+  if (state.visit) apply();
+};
+window.saveVisitNote = (npsn, btn) => {
+  const ta = document.getElementById('vnote-' + npsn);
+  if (!ta) return;
+  const v = visits[npsn] || (visits[npsn] = {status:'none'});
+  v.note = ta.value.trim(); v.updated = Date.now();
+  if ((v.status||'none') === 'none' && !v.note) delete visits[npsn];
+  saveVisits(); updateVisitStats();
+  pushVisit(npsn);
+  if (btn){
+    btn.textContent = '✓ Tersimpan';
+    setTimeout(() => { btn.textContent = '💾 Simpan catatan'; }, 1500);
+  }
+};
+
+// ---------- Sinkronisasi Google Sheets ----------
+const SHEETS_URL_KEY = 'sora_sheets_url';
+const PENDING_KEY = 'sora_sheets_pending';
+let sheetsUrl = localStorage.getItem(SHEETS_URL_KEY) || '';
+let pending = new Set(JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'));
+const savePending = () => localStorage.setItem(PENDING_KEY, JSON.stringify([...pending]));
+
+function setSyncStatus(cls, text){
+  const el = document.getElementById('syncStatus');
+  el.className = 'sync-status ' + cls;
+  el.textContent = text;
+}
+
+function recordFor(npsn){
+  const v = visits[npsn] || {status:'none', note:''};
+  const x = byNpsn[npsn];
+  const s = x ? x.s : (SCHOOLS.find(r => r[F.NPSN] === npsn) || []);
+  return {
+    npsn, nama_sekolah:s[F.NAMA]||'', jenjang:s[F.JENJANG]||'',
+    kecamatan:s[F.KEC]||'', kota:s[F.KOTA]||'',
+    status:v.status||'none', note:v.note||'', updated:v.updated||Date.now()
+  };
+}
+
+// kirim satu perubahan; bila gagal/offline, antrekan untuk retry
+async function pushVisit(npsn){
+  if (!sheetsUrl) return;
+  pending.add(npsn); savePending();
+  flushPending();
+}
+
+let flushing = false;
+async function flushPending(){
+  if (!sheetsUrl || flushing || pending.size === 0) return;
+  if (!navigator.onLine){ setSyncStatus('err', '○ Offline — menunggu koneksi'); return; }
+  flushing = true;
+  setSyncStatus('busy', '⟳ Menyimpan…');
+  const batch = [...pending];
+  try {
+    const res = await fetch(sheetsUrl, {
+      method:'POST', redirect:'follow',
+      body: JSON.stringify({ records: batch.map(recordFor) })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'gagal');
+    batch.forEach(n => pending.delete(n)); savePending();
+    setSyncStatus('on', '● Tersimpan ke Sheets');
+  } catch(err){
+    setSyncStatus('err', '○ Gagal kirim — akan dicoba lagi');
+  } finally {
+    flushing = false;
+    if (pending.size) setTimeout(flushPending, 4000);
+  }
+}
+window.addEventListener('online', flushPending);
+
+// gabungkan data remote (Sheet) ke lokal berdasarkan waktu terbaru
+function mergeRemote(remote){
+  let changed = 0;
+  for (const npsn in remote){
+    const r = remote[npsn];
+    const l = visits[npsn];
+    if (!l || (r.updated||0) >= (l.updated||0)){
+      if ((r.status||'none') === 'none' && !(r.note||'').trim()){
+        if (l){ delete visits[npsn]; changed++; }
+      } else {
+        visits[npsn] = { status:r.status||'none', note:r.note||'', updated:r.updated||0 };
+        changed++;
+      }
+    }
+  }
+  return changed;
+}
+
+async function syncNow(){
+  if (!sheetsUrl){ alert('Belum terhubung. Tempel Web app URL lalu klik Hubungkan.'); return; }
+  if (!navigator.onLine){ setSyncStatus('err', '○ Offline'); return; }
+  setSyncStatus('busy', '⟳ Sinkron…');
+  try {
+    // 1) tarik data tim
+    const res = await fetch(sheetsUrl + (sheetsUrl.includes('?') ? '&' : '?') + 't=' + Date.now(), { redirect:'follow' });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'respons tidak valid');
+    const remote = data.visits || {};
+
+    // 2) catatan lokal yang lebih baru dari remote -> antrekan untuk push
+    for (const npsn in visits){
+      const l = visits[npsn], r = remote[npsn];
+      if (!r || (l.updated||0) > (r.updated||0)) pending.add(npsn);
+    }
+    savePending();
+
+    // 3) gabungkan remote ke lokal
+    const changed = mergeRemote(remote);
+    saveVisits();
+    for (const x of markers) x.m.setIcon(iconFor(x));
+    updateVisitStats(); apply();
+
+    // 4) dorong yang tertunda ke Sheet
+    await flushPending();
+    if (!pending.size) setSyncStatus('on', '● Tersinkron • ' + new Date().toLocaleTimeString('id-ID'));
+  } catch(err){
+    setSyncStatus('err', '○ Gagal sinkron — cek URL/izin');
+    console.error(err);
+  }
+}
+
+function connectSheets(url){
+  url = (url||'').trim();
+  if (!/^https:\/\/script\.google\.com\/.*\/exec$/.test(url)){
+    if (!confirm('URL tidak biasa (harusnya diakhiri /exec dari script.google.com). Tetap gunakan?')) return;
+  }
+  sheetsUrl = url;
+  localStorage.setItem(SHEETS_URL_KEY, url);
+  document.getElementById('sheetsUrl').value = url;
+  syncNow();
+}
+
+document.getElementById('sheetsUrl').value = sheetsUrl;
+document.getElementById('connectBtn').onclick = () => connectSheets(document.getElementById('sheetsUrl').value);
+document.getElementById('syncBtn').onclick = syncNow;
+
+function updateVisitStats(){
+  const counts = {none:0, progress:0, ditolak:0, diterima:0};
+  for (const x of markers) counts[visitOf(x.s[F.NPSN]).status || 'none']++;
+  document.getElementById('visitStats').innerHTML = Object.keys(VSTATUS).map(k =>
+    `<div><span class="dot" style="background:${VCOLOR[k]}"></span>${VSTATUS[k]} <span style="float:right">${counts[k].toLocaleString('id-ID')}</span></div>`
+  ).join('');
+}
+
+// ---------- Filter UI ----------
+const state = {jenjang:new Set(), kota:'', kec:'', akr:'', visit:'', q:''};
+
+const uniq = idx => [...new Set(SCHOOLS.map(s=>s[idx]).filter(v=>v && v!=='-'))].sort();
+
+// chips jenjang
+const chipBox = document.getElementById('chipJenjang');
+const jenjangList = [...new Set(markers.map(x=>x.jj))].sort((a,b)=>{
+  const order = ['SD','SMP','SMA','SMK','Lainnya'];
+  return order.indexOf(a)-order.indexOf(b);
+});
+for (const j of jenjangList){
+  const c = document.createElement('div');
+  c.className = 'chip';
+  c.style.setProperty('--dot', COLORS[j]);
+  c.innerHTML = `<span class="dot"></span>${j}`;
+  c.onclick = () => {
+    state.jenjang.has(j) ? state.jenjang.delete(j) : state.jenjang.add(j);
+    c.classList.toggle('active');
+    apply();
+  };
+  chipBox.appendChild(c);
+}
+
+// selects
+const selKota  = document.getElementById('selKota');
+const selKec   = document.getElementById('selKec');
+const selAkr   = document.getElementById('selAkr');
+const selVisit = document.getElementById('selVisit');
+
+uniq(F.KOTA).forEach(v => selKota.add(new Option(v.replace('Kota Adm. ','').replace('Kab. Adm. ','Kab. '), v)));
+uniq(F.AKR).forEach(v => selAkr.add(new Option(v, v)));
+
+function fillKecamatan(){
+  const cur = selKec.value;
+  selKec.innerHTML = '<option value="">Semua kecamatan</option>';
+  const pool = state.kota ? SCHOOLS.filter(s=>s[F.KOTA]===state.kota) : SCHOOLS;
+  [...new Set(pool.map(s=>s[F.KEC]).filter(Boolean))].sort()
+    .forEach(v => selKec.add(new Option(v, v)));
+  selKec.value = [...selKec.options].some(o=>o.value===cur) ? cur : '';
+  state.kec = selKec.value;
+}
+fillKecamatan();
+
+selKota.onchange  = () => { state.kota  = selKota.value; fillKecamatan(); apply(); };
+selKec.onchange   = () => { state.kec   = selKec.value;   apply(); };
+selAkr.onchange   = () => { state.akr   = selAkr.value;   apply(); };
+selVisit.onchange = () => { state.visit = selVisit.value;  apply(); };
+
+let debounce;
+document.getElementById('search').addEventListener('input', e => {
+  clearTimeout(debounce);
+  debounce = setTimeout(() => { state.q = e.target.value.trim().toLowerCase(); apply(); }, 200);
+});
+
+document.getElementById('resetBtn').onclick = () => {
+  state.jenjang.clear(); state.kota=''; state.kec=''; state.akr=''; state.visit=''; state.q='';
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+  selKota.value=''; selAkr.value=''; selVisit.value=''; document.getElementById('search').value='';
+  fillKecamatan(); apply();
+  map.setView([-6.2,106.83], 11);
+};
+
+// ---------- Apply ----------
+function apply(){
+  cluster.clearLayers();
+  const shown = [];
+  for (const x of markers){
+    const s = x.s;
+    if (state.jenjang.size && !state.jenjang.has(x.jj)) continue;
+    if (state.kota && s[F.KOTA] !== state.kota) continue;
+    if (state.kec  && s[F.KEC]  !== state.kec)  continue;
+    if (state.akr  && s[F.AKR]  !== state.akr)  continue;
+    if (state.visit && (visitOf(s[F.NPSN]).status || 'none') !== state.visit) continue;
+    if (state.q && !x.text.includes(state.q)) continue;
+    shown.push(x.m);
+  }
+  cluster.addLayers(shown);
+  document.getElementById('statShown').textContent = shown.length.toLocaleString('id-ID');
+
+  // zoom ke hasil bila filter aktif dan hasil sedikit
+  const filtered = state.jenjang.size || state.kota || state.kec || state.akr || state.q;
+  if (filtered && shown.length > 0 && shown.length <= 400){
+    map.fitBounds(L.featureGroup(shown).getBounds().pad(0.15), {maxZoom:15});
+  }
+}
+
+// ---------- Legend & stats ----------
+document.getElementById('legend').innerHTML = jenjangList.map(j=>{
+  const n = markers.filter(x=>x.jj===j).length;
+  return `<div><span class="dot" style="background:${COLORS[j]}"></span>${j} <span style="float:right">${n.toLocaleString('id-ID')}</span></div>`;
+}).join('');
+document.getElementById('statTotal').textContent = markers.length.toLocaleString('id-ID');
+document.getElementById('noteCoords').textContent =
+  `Sumber peta: OpenStreetMap / CARTO Positron. ${noCoords.toLocaleString('id-ID')} sekolah tidak memiliki koordinat sehingga tidak tampil di peta. ` +
+  `Status & catatan kunjungan tersimpan di browser ini (localStorage) — gunakan Backup JSON untuk memindahkan ke perangkat lain.`;
+
+// ---------- Ekspor / Backup / Restore ----------
+function download(filename, text, mime){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], {type:mime}));
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+const today = () => new Date().toISOString().slice(0,10);
+
+document.getElementById('exportCsv').onclick = () => {
+  const npsnList = Object.keys(visits);
+  if (!npsnList.length) { alert('Belum ada data kunjungan untuk diekspor.'); return; }
+  const q = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
+  const lines = ['npsn,nama_sekolah,jenjang,kecamatan,kota,status_kunjungan,catatan,diperbarui'];
+  for (const npsn of npsnList){
+    const v = visits[npsn];
+    const s = (byNpsn[npsn] || {}).s || SCHOOLS.find(r => r[F.NPSN] === npsn) || [];
+    lines.push([
+      q(npsn), q(s[F.NAMA]), q(s[F.JENJANG]), q(s[F.KEC]), q(s[F.KOTA]),
+      q(VSTATUS[v.status || 'none']), q(v.note || ''),
+      q(v.updated ? new Date(v.updated).toLocaleString('id-ID') : '')
+    ].join(','));
+  }
+  download(`kunjungan_sekolah_${today()}.csv`, String.fromCharCode(0xFEFF) + lines.join('\r\n'), 'text/csv;charset=utf-8');
+};
+
+document.getElementById('backupJson').onclick = () => {
+  download(`backup_kunjungan_${today()}.json`, JSON.stringify(visits, null, 2), 'application/json');
+};
+
+const restoreFile = document.getElementById('restoreFile');
+document.getElementById('restoreJson').onclick = () => restoreFile.click();
+restoreFile.onchange = () => {
+  const f = restoreFile.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (typeof data !== 'object' || Array.isArray(data)) throw new Error('format tidak dikenali');
+      Object.assign(visits, data);
+      saveVisits();
+      for (const x of markers) x.m.setIcon(iconFor(x));
+      updateVisitStats(); apply();
+      alert(`Berhasil memulihkan ${Object.keys(data).length} catatan kunjungan.`);
+    } catch(e) {
+      alert('File backup tidak valid: ' + e.message);
+    }
+    restoreFile.value = '';
+  };
+  reader.readAsText(f);
+};
+
+updateVisitStats();
+
+// ---------- Mobile sidebar ----------
+const sidebar = document.getElementById('sidebar');
+const scrim = document.getElementById('scrim');
+document.getElementById('togglePanel').onclick = () => { sidebar.classList.add('open'); scrim.classList.add('show'); };
+scrim.onclick = () => { sidebar.classList.remove('open'); scrim.classList.remove('show'); };
+
+apply();
+
+// ---------- Sinkron otomatis saat dimuat ----------
+if (sheetsUrl){
+  setSyncStatus('busy', '⟳ Menghubungkan…');
+  syncNow();
+} else if (pending.size){
+  setSyncStatus('off', '○ Belum terhubung (' + pending.size + ' perubahan lokal)');
+}
+</script>
+</body>
+</html>
