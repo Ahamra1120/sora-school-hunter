@@ -210,13 +210,8 @@
 
       <div class="group">
         <label class="title">Sinkronisasi (Google Sheets)</label>
-        <div id="syncStatus" class="sync-status off">○ Belum terhubung</div>
-        <input id="sheetsUrl" type="url" placeholder="Tempel Web app URL (…/exec)" style="margin-bottom:6px">
-        <div style="display:flex; gap:6px">
-          <button class="btn-sm" id="connectBtn" style="margin:0">🔗 Hubungkan</button>
-          <button class="btn-sm" id="syncBtn" style="margin:0">🔄 Sinkron</button>
-        </div>
-        <div class="note" style="border:0; padding:4px 0 0; font-size:10.5px">Lihat <i>SETUP_GOOGLE_SHEETS.md</i> untuk cara mendapatkan URL.</div>
+        <div id="syncStatus" class="sync-status busy">⟳ Menghubungkan…</div>
+        <button class="btn-sm" id="syncBtn" style="margin-top:6px">🔄 Sinkron sekarang</button>
       </div>
 
       <div class="group">
@@ -366,9 +361,8 @@ window.saveVisitNote = (npsn, btn) => {
 };
 
 // ---------- Sinkronisasi Google Sheets ----------
-const SHEETS_URL_KEY = 'sora_sheets_url';
+const GS_URL = 'https://script.google.com/macros/s/AKfycbz7CerGKglNWTE_hnSVJfcAL7SRHZGNI_9B8eLMqhVCiZUa4ykWdTX69MeB6NN_1f0m2Q/exec';
 const PENDING_KEY = 'sora_sheets_pending';
-let sheetsUrl = localStorage.getItem(SHEETS_URL_KEY) || '';
 let pending = new Set(JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'));
 const savePending = () => localStorage.setItem(PENDING_KEY, JSON.stringify([...pending]));
 
@@ -391,20 +385,19 @@ function recordFor(npsn){
 
 // kirim satu perubahan; bila gagal/offline, antrekan untuk retry
 async function pushVisit(npsn){
-  if (!sheetsUrl) return;
   pending.add(npsn); savePending();
   flushPending();
 }
 
 let flushing = false;
 async function flushPending(){
-  if (!sheetsUrl || flushing || pending.size === 0) return;
+  if (flushing || pending.size === 0) return;
   if (!navigator.onLine){ setSyncStatus('err', '○ Offline — menunggu koneksi'); return; }
   flushing = true;
   setSyncStatus('busy', '⟳ Menyimpan…');
   const batch = [...pending];
   try {
-    const res = await fetch(sheetsUrl, {
+    const res = await fetch(GS_URL, {
       method:'POST', redirect:'follow',
       body: JSON.stringify({ records: batch.map(recordFor) })
     });
@@ -440,12 +433,11 @@ function mergeRemote(remote){
 }
 
 async function syncNow(){
-  if (!sheetsUrl){ alert('Belum terhubung. Tempel Web app URL lalu klik Hubungkan.'); return; }
   if (!navigator.onLine){ setSyncStatus('err', '○ Offline'); return; }
   setSyncStatus('busy', '⟳ Sinkron…');
   try {
     // 1) tarik data tim
-    const res = await fetch(sheetsUrl + (sheetsUrl.includes('?') ? '&' : '?') + 't=' + Date.now(), { redirect:'follow' });
+    const res = await fetch(GS_URL + '?t=' + Date.now(), { redirect:'follow' });
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || 'respons tidak valid');
     const remote = data.visits || {};
@@ -472,19 +464,6 @@ async function syncNow(){
   }
 }
 
-function connectSheets(url){
-  url = (url||'').trim();
-  if (!/^https:\/\/script\.google\.com\/.*\/exec$/.test(url)){
-    if (!confirm('URL tidak biasa (harusnya diakhiri /exec dari script.google.com). Tetap gunakan?')) return;
-  }
-  sheetsUrl = url;
-  localStorage.setItem(SHEETS_URL_KEY, url);
-  document.getElementById('sheetsUrl').value = url;
-  syncNow();
-}
-
-document.getElementById('sheetsUrl').value = sheetsUrl;
-document.getElementById('connectBtn').onclick = () => connectSheets(document.getElementById('sheetsUrl').value);
 document.getElementById('syncBtn').onclick = syncNow;
 
 function updateVisitStats(){
@@ -590,7 +569,7 @@ document.getElementById('legend').innerHTML = jenjangList.map(j=>{
 document.getElementById('statTotal').textContent = markers.length.toLocaleString('id-ID');
 document.getElementById('noteCoords').textContent =
   `Sumber peta: OpenStreetMap / CARTO Positron. ${noCoords.toLocaleString('id-ID')} sekolah tidak memiliki koordinat sehingga tidak tampil di peta. ` +
-  `Status & catatan kunjungan tersimpan di browser ini (localStorage) — gunakan Backup JSON untuk memindahkan ke perangkat lain.`;
+  `Status & catatan kunjungan disimpan bersama di Google Sheets dan disinkronkan otomatis saat halaman dibuka.`;
 
 // ---------- Ekspor / Backup / Restore ----------
 function download(filename, text, mime){
@@ -657,12 +636,7 @@ scrim.onclick = () => { sidebar.classList.remove('open'); scrim.classList.remove
 apply();
 
 // ---------- Sinkron otomatis saat dimuat ----------
-if (sheetsUrl){
-  setSyncStatus('busy', '⟳ Menghubungkan…');
-  syncNow();
-} else if (pending.size){
-  setSyncStatus('off', '○ Belum terhubung (' + pending.size + ' perubahan lokal)');
-}
+syncNow();
 </script>
 </body>
 </html>
